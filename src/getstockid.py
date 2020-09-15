@@ -10,6 +10,16 @@ idsCsvPath=os.path.join(os.path.abspath(os.path.dirname(pwd)+os.path.sep+"."), '
 basePath = '/User/liujinf/'
 
 
+def readstockids():
+    rootfolder = getrootpath()
+    idscsvpath = os.path.join(rootfolder, 'ids.csv')
+    pdIds = pd.read_csv(idscsvpath)['ts_code']
+    return pdIds
+
+def getrootpath():
+    return os.path.join(os.path.abspath(os.path.dirname(pwd) + os.path.sep + "."), 'data')
+
+
 def todaydate():
     today = datetime.datetime.today()
     searchday = (today - datetime.timedelta(weeks=4 * 52)).strftime('%Y-%m-%d')
