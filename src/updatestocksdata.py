@@ -19,6 +19,7 @@ for id in pdIds:
     # idData = ts.get_hist_data(id.split('.')[0])
     # idPath = os.path.join(rootFolder, id + '.csv')
     # idData.to_csv(idPath)
+    id = '300569.SZ' # '300317.SZ'
     ids = id.split('.')
     print(ids[1].lower() + '.' + ids[0])
     rs = bs.query_history_k_data_plus(ids[1].lower() + '.' + ids[0],

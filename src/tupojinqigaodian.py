@@ -15,87 +15,156 @@ rootpath = getstockid.getrootpath()
 #               3. 日最大涨幅都不是很大，基本没有涨停
 #               4. 至少一个一个3日的中枢，中枢日内收盘价高于5日均线
 #               5. 被突破之后有一个上影线，因为大盘跌造成的
-def buymethod1(data, endDate):
+def buymethod1(data, endDate, cdoe):
     subdata = data[:endDate]
     fitMax = stockutils.breakupMax(subdata, 80)
     ustyle = stockutils.averagelineUstyle(subdata, 'ma60', 80)
     raiseCheck = stockutils.raiseanddowncheck(subdata, 6.0, 80)
-    daycenter, _ = stockutils.centerCheck(subdata)
-    topline = stockutils.daytopsingleline(subdata, chechrate=80)
+    daycenter, _ = stockutils.centerCheck(subdata[:-1])
+    topline = stockutils.daytopsingleline(subdata, chechrate=4)
     if fitMax and ustyle and raiseCheck and daycenter and topline:
         return True
     return False
 
 
-# 检测方法，2，2020-09-08，任子行，
+# 检测方法，2，2020-09-07，任子行，300311.SZ
 #               1. 突破60日最高点，
 #               2. 60日均线有一个下落，平缓，再试图拉起的过程，
-#               3. 之前有连续的2个日线中枢，3到5日都有可能，不超过5日。
+#               3. 之前有连续的2个日线中枢，3到5日都有可Î能，不超过5日。
 #               4.近期单日涨幅不大，不超过6%，没有涨停。
-#               5.当日指数大跌，有上影线，并且较长。
+#               5.当日大盘指数大跌，有上影线，并且较长。
 #               6, 当日最低不低于5日线均线,
 #               7.在做中枢的区间里，最低值没有低于10日线，碰10日线立即拉升形成中枢,
-#               8. 中枢形态是两边高，中间低，中间，中间的振幅小
-def buymethod2(data, endDate):
+#               8. 中枢形态是两边高，中间低，中间的振幅小
+def buymethod2(data, endDate, cdoe):
     subdata = data[:endDate]
-    fitMax = stockutils.breakupMax(subdata)
-    ustyle = stockutils.averagelineUstyle(subdata, 'ma60')
-    raiseCheck = stockutils.raiseanddowncheck(subdata, 6.0)
-    topline = stockutils.daytopsingleline(subdata, chechrate=80)
+    check1 = stockutils.breakupMax(subdata)
+    check2 = stockutils.averagelineUstyle(subdata, 'ma60')
+    check3, days = stockutils.centerCheck(subdata[:-1], 'ma10')
+    if not check3:
+        return False
+    check3, _ = stockutils.centerCheck(subdata[:-1-days], 'ma10')
+    if not check3:
+        return False
+    check4 = stockutils.raiseanddowncheck(subdata, 6.0)
+
+    check5 = stockutils.daytopsingleline(subdata, chechrate=3)
+    check6 = subdata['low'][-1] > subdata['ma5'][-1]
+    check7 = stockutils.midcentercheck(subdata[:-1])
+    return check1 and check2 and check3 and check4 and check5 and check6 and check7
 
 
 
-# 检测方法，3，200821-200822，东方热电，
-#               1. 近期突破60日高点。
+# 检测方法，3，200821-200824，东方热电，id = '300217.SZ'
+#               1. 近期突破60日高点，至少站上20日均线, 距离60日最低点涨幅不超过50%
 #               2，回调过程中连续两日出现下影线，10日或者20日均线相交，
 #               3。连续两日均是收盘高于开盘，涨幅不大，不超过3%，
 #               4，今日最低点高于前一日最低点，
-#               5.距离60日最低点涨幅不超过50%
-#               6. 5日内出现过超过5%的大跌
-def buymethod3():
-    pass
+#               5. 5日内出现过超过5%的大跌
+#               6. 均线呈现 5 > 10 > 20 > 60
+def buymethod3(data, enddate, cdoe):
+    subdata = data[:enddate]
+    check1 = stockutils.breakupmaxinperday(subdata) and subdata['low'][-1] > subdata['ma20'][-1]
+    check2 = stockutils.continuefitfunction(subdata, stockutils.bottomsingleline(2.5))
+    check3 = (3 > subdata['pctChg'][-1] > 0) and (3 > subdata['pctChg'][-2] > 0)
+    check4 = subdata['low'][-1] > subdata['low'][-2]
+    check5 = subdata.iloc[-5:, -12].min() < -5  # 加上了均值线
+    check6 = stockutils.continuefitfunction(subdata, stockutils.averagelineorder, continuedata=5)
+    return check1 and check2 and check3 and check4 and check5 and check6
 
 
-# 急剧震荡型，4。200810-200817。露笑科技
+# 急剧震荡型，4。200810-200817。露笑科技, 002617.SZ
 #               1. 近期10日，内突破60日内最高点。
 #               2. 60日均线呈现出一个U型，
 #               3。近期出现过涨停，然后涨停之后急剧下跌，然后又拉起，
-#               4，连续2日或3日下跌，跌幅一共至少超过6%
-def buymethod4():
-    pass
+#               4，连续2日或3日下跌，跌幅一共至少超过6%,
+#               5. 30个交易日内最低点到最高点涨幅不超过50%
+#               6. 每日高点到低点的降幅不超过15， 30
+def buymethod4(data, endDate, code):
+    subdata = data[:endDate]
+    check1 = stockutils.breakupinrange(subdata)
+    check2 = stockutils.averagelineUstyle(subdata, 'ma60')
+    check3 = stockutils.zhengdangtype(subdata)
+    check4 = stockutils.daydownfind(subdata, checkrate=8.0)
+    check5 = stockutils.buttomtotopcheck(subdata)
+    check6 = stockutils.toptobottomcheck(subdata, code)
+    return check1 and check2 and check3 and check4 and check5 and check6
 
 
 # 高位涨停，跌停交替型，300185，通裕重工，珈伟新能，300317，时间2020-09-14
 #         1. 非创业板，涨幅10，创业板20，10个交易日能出现涨停，
 #         2. 2日内出现大幅下跌，要么跌停，要么跌幅每日跌幅都超过5%或者10%
+def buymethod5(data, endData, code):
+    chuangyeban = '300' in code
+    # check1 = 0
+    # check2 = 0
+    subdata = data[:endData]
+    if chuangyeban:
+        check1 = stockutils.largestepdaycount(data, checkrate=19.5)
+    else:
+        check1 = stockutils.largestepdaycount(data, checkrate=9.5)
+
+    if chuangyeban:
+        check2 = stockutils.largestepdaycount(data, checkrate=-10.0, large=False)
+    else:
+        check2 = stockutils.largestepdaycount(data, checkrate=-5, large=False)
+    check3 = stockutils.buttomtotopcheck(subdata)
+    return check1 >= 1 and check2 >= 2 and check3
 
 
-# 大盘下跌日，高位出现上影线，天能重工300569，2020-09-10
-#       1. 突破高位  2. 最近没有涨停  3. 连续两日出现上影线，这两日的最高点超过之前60日最高点
+# 大盘下跌日，高位出现上影线，天能重工300569.SZ，2020-09-10
+#       1. 突破高位
+#       2. 最近没有涨停
+#       3. 连续两日出现上影线，这两日的最高点超过之前60日最高点
+#       4. 之前有两个波动，第一个波动之前已经破新高，这个算法比较复杂
+def bugmethod6(data, endDate, code):
+    subdata = data[:endDate]
+    check1 = stockutils.breakupMax(subdata) or stockutils.breakupMax(subdata[:-1])
+    chuangyeban = '300' in code
+    raiserate = 2.5
+    if chuangyeban:
+        raiserate = 5
+        check2 = stockutils.raiseanddowncheck(subdata, 15.0, 60, 0)
+    else:
+        check2 = stockutils.raiseanddowncheck(subdata, 8.0, 60)
+    check3 = stockutils.daytopsingleline(data, chechrate=4) and stockutils.daytopsingleline(data[: -1], chechrate=4) and subdata['pctChg'][-1] < raiserate and subdata['pctChg'][-2] < raiserate
+    check4 = stockutils.mergeklineandcheckcenter(subdata[-12:-2])
+    return check1 and check2 and check3 and check4
 
 
-
-
-
-stock_list1 = [] # 突破到至少60个交易日的最高点
-stock_list2 = [] # macd日线背驰
-stock_list3 = [] # 连续3日持续下跌
+funarr = [buymethod1, buymethod2, buymethod3, buymethod4, buymethod5, bugmethod6]
+result = []
+for i in range(6):
+    result.append([])
 for id in stockids:
-    id = '300313.SZ'
+    # id = '300338.SZ'
     idfile = os.path.join(rootpath, id + '.csv')
     iddata = pd.read_csv(idfile, index_col='date', parse_dates=['date'])
     macd,  _, _ = stockutils.calculateMACD(iddata['close'])
     iddata['macd'] = macd
     iddata['ma5'] = iddata['close'].rolling(5).mean()
-    iddata['ma10'] = iddata['close'].rolling(5).mean()
-    iddata['ma20'] = iddata['close'].rolling(5).mean()
-    iddata['ma30'] = iddata['close'].rolling(5).mean()
-    iddata['ma60'] = iddata['close'].rolling(5).mean()
-    iddata['ma250'] = iddata['close'].rolling(5).mean()
-    subdata = iddata[:'2020-08-18']
-    fitMax = stockutils.breakupMax(subdata)
-    ustyle = stockutils.averagelineUstyle(subdata, 'ma60', 80)
-    raiseCheck = stockutils.raiseanddowncheck(subdata, 6.0, 80)
-    topline = stockutils.daytopsingleline(subdata)
-    midcenter = stockutils.centerCheck(subdata)
-    print(macd)
+    iddata['ma10'] = iddata['close'].rolling(10).mean()
+    iddata['ma20'] = iddata['close'].rolling(20).mean()
+    iddata['ma30'] = iddata['close'].rolling(30).mean()
+    iddata['ma60'] = iddata['close'].rolling(60).mean()
+    iddata['ma250'] = iddata['close'].rolling(250).mean()
+    # 市盈率检测
+    if not stockutils.pecheck(iddata):
+        continue
+    # subdata = iddata[:'2020-08-18']
+    # method1 = buymethod1(iddata, '2020-08-18')
+    # method2 = buymethod2(iddata, '2020-09-07')
+    # method3 = buymethod3(iddata, '2020-08-24')
+    # method4 = buymethod4(iddata, '2020-08-17')
+    # method5 = buymethod5(iddata, '2020-09-14', '300317')
+    # method6 = bugmethod6(iddata, '2020-09-10', '300569')
+    ids = id.split('.')
+    print(ids[0])
+    for i in range(6):
+        if funarr[i](iddata, '2020-08-18', ids[0]):
+            result[i].append(ids[0])
+    #print(method6)
+
+for list in result:
+    print('#########################  method ', i, "############################")
+    print(list)
