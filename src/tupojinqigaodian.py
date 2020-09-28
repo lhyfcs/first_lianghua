@@ -3,11 +3,11 @@ import numpy as np
 import os
 import getstockid
 import stockutils
-
+import updatestocksdata
+import baostock as bs
 
 stockids = getstockid.readstockids()
 rootpath = getstockid.getrootpath()
-
 
 # 检测方法，1，2020-08-13，天山生物，
 #               1. 近期突破80日高点，也就是4个月，
@@ -132,39 +132,89 @@ def bugmethod6(data, endDate, code):
     return check1 and check2 and check3 and check4
 
 
-funarr = [buymethod1, buymethod2, buymethod3, buymethod4, buymethod5, bugmethod6]
-result = []
-for i in range(6):
-    result.append([])
-for id in stockids:
-    # id = '300338.SZ'
-    idfile = os.path.join(rootpath, id + '.csv')
-    iddata = pd.read_csv(idfile, index_col='date', parse_dates=['date'])
-    macd,  _, _ = stockutils.calculateMACD(iddata['close'])
-    iddata['macd'] = macd
-    iddata['ma5'] = iddata['close'].rolling(5).mean()
-    iddata['ma10'] = iddata['close'].rolling(10).mean()
-    iddata['ma20'] = iddata['close'].rolling(20).mean()
-    iddata['ma30'] = iddata['close'].rolling(30).mean()
-    iddata['ma60'] = iddata['close'].rolling(60).mean()
-    iddata['ma250'] = iddata['close'].rolling(250).mean()
-    # 市盈率检测
-    if not stockutils.pecheck(iddata):
-        continue
-    # subdata = iddata[:'2020-08-18']
-    # method1 = buymethod1(iddata, '2020-08-18')
-    # method2 = buymethod2(iddata, '2020-09-07')
-    # method3 = buymethod3(iddata, '2020-08-24')
-    # method4 = buymethod4(iddata, '2020-08-17')
-    # method5 = buymethod5(iddata, '2020-09-14', '300317')
-    # method6 = bugmethod6(iddata, '2020-09-10', '300569')
-    ids = id.split('.')
-    print(ids[0])
-    for i in range(6):
-        if funarr[i](iddata, '2020-08-18', ids[0]):
-            result[i].append(ids[0])
-    #print(method6)
+# 连续5日下跌，跌幅均不超过1%，每日均是绿盘， 000728.SZ 国元证券,2020-09-17
+#       1. 连续5日下跌，
+#       2. 连续5日绿色
+#       3. 每日跌幅均不超过1%
+#       4. 今日最低是30交易日内最低点
+#       5. macd往前推2红2绿，红面积极其小于绿面积
+#
+def buymethod7(data, endData, code):
+    subdata = data[:endData]
+    fivedata = subdata[-5:]
+    check1 = len(fivedata[fivedata['pctChg'] < 0]) == 5
+    check2 = len(fivedata[fivedata['open'] >= fivedata['close']]) == 5
+    check3 = len(fivedata[fivedata['pctChg'] > -1]) == 5
+    sub1 = subdata[-30:]
+    check4 = sub1['low'][-1] == sub1['low'].min()
+    check5 = stockutils.macdstatuscheck(subdata)
+    return check1 and check2 and check3 and check4 and check5
 
-for list in result:
-    print('#########################  method ', i, "############################")
-    print(list)
+# 连续5日上涨之后接连两天下跌。曙光股份，600303.SH，2020-09-24
+#           1. 之前连续5天上涨，每天上涨幅度均不超过4%，
+#           2. 连续2天下跌
+#           3. 日线价格高于60日均线
+
+def buymethod8(data, endData, code):
+    subdata = data[:endData]
+    def raisecheck(d):
+        return 0 < d['pctChg'][-1] < 4
+    check1 = stockutils.continuefitfunction(subdata[:-2], raisecheck, 5)
+    def reduceCheck(d):
+        return -5 < d['pctChg'][-1] < 0
+    check2 = stockutils.continuefitfunction(subdata, reduceCheck, 2)
+    check3 = subdata['close'][-1] > subdata['ma60'][-1]
+    return check1 and check2 and check3
+
+
+# getids
+
+if __name__ == '__main__':
+    bs.login()
+    idCollect = getstockid.GetStockId()
+    #idCollect.downloadStockIdByDate()
+
+    # download data
+    dataUpdater = updatestocksdata.UpdateSocketData()
+    #dataUpdater.update()
+    bs.logout()
+    funarr = [buymethod1, buymethod2, buymethod3, buymethod4, buymethod5, bugmethod6, buymethod7, buymethod8]
+    result = []
+    for i in range(len(funarr)):
+        result.append([])
+
+    for id in stockids:
+        # id = '600303.SH'
+        idfile = os.path.join(rootpath, id + '.csv')
+        iddata = pd.read_csv(idfile, index_col='date', parse_dates=['date'])
+        macd,  _, _ = stockutils.calculateMACD(iddata['close'])
+        iddata['macd'] = macd
+        iddata['ma5'] = iddata['close'].rolling(5).mean()
+        iddata['ma10'] = iddata['close'].rolling(10).mean()
+        iddata['ma20'] = iddata['close'].rolling(20).mean()
+        iddata['ma30'] = iddata['close'].rolling(30).mean()
+        iddata['ma60'] = iddata['close'].rolling(60).mean()
+        iddata['ma250'] = iddata['close'].rolling(250).mean()
+        # method8 = buymethod8(iddata, '2020-09-24', '600303')
+        # 市盈率检测
+        if not stockutils.pecheck(iddata):
+            continue
+        # subdata = iddata[:'2020-08-18']
+        # method1 = buymethod1(iddata, '2020-08-18')
+        # method2 = buymethod2(iddata, '2020-09-07')
+        # method3 = buymethod3(iddata, '2020-08-24')
+        # method4 = buymethod4(iddata, '2020-08-17')
+        # method5 = buymethod5(iddata, '2020-09-14', '300317')
+        # method6 = bugmethod6(iddata, '2020-09-10', '300569')
+        ids = id.split('.')
+        print(ids[0])
+
+        for i in range(len(funarr)):
+            if funarr[i](iddata, '2020-09-28', ids[0]):
+                result[i].append(ids[0])
+
+    for i in range(len(result)):
+        print('#########################  method ', i, "############################")
+        print(result[i])
+
+    print('complete')

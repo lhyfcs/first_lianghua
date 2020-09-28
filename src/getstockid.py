@@ -40,7 +40,6 @@ class GetStockId:
     def __init__(self):
         pass
 
-
     def downloadStockIdByDate(self):
         checkday = todaydate()
         pro = ts.pro_api()

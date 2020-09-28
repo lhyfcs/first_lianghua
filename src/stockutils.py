@@ -280,3 +280,16 @@ def mergeklineandcheckcenter(data):
         if find:
             return True
     return False
+
+
+def macdstatuscheck(data):
+    if data['macd'][-1] > 0:
+        return False
+    st1 = data['macd'] > 0
+    st2 = data['macd'] <= 0
+    downtime = data[st1 & st2.shift(-1)].index
+    uptime = data[st2 & st1.shift(-1)].index
+
+    reds = [data[uptime[-1]: downtime[-1]]['macd'].sum(), data[uptime[-2]: downtime[-2]]['macd'].sum()]
+    greens = [data[downtime[-1]:]['macd'].sum(), data[downtime[-2]: uptime[-1]]['macd'].sum()]
+    return reds[1] > reds[0] and reds[1] / reds[0] > 2
