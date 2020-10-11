@@ -39,9 +39,20 @@
     ![avatar](./img/dongfangdianre.png)
       
   > buymethod4
+    ![avatar](./img/luxiaokeji.png)
 
   > buymethod5
+    ![avatar](./img/jiaweixinneng.png)
 
   > buymethon6
+    ![avatar](./img/tiannengzhonggong.png)
 
   > buymethod7
+    ![avatar](./img/guoyuanzhengquan.png)
+
+  > buymethod8
+    ![avatar](./img/shuguanggufen.png)
+
+  > buymethod9
+    ![avatar](./img/yijingguangdian.png)
+    ![avatar](./img/tuorixinneng.png)

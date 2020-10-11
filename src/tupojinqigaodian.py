@@ -73,7 +73,7 @@ def buymethod3(data, enddate, cdoe):
     return check1 and check2 and check3 and check4 and check5 and check6
 
 
-# 急剧震荡型，4。200810-200817。露笑科技, 002617.SZ
+# 急剧震荡型，4。200810-200819。露笑科技, 002617.SZ
 #               1. 近期10日，内突破60日内最高点。
 #               2. 60日均线呈现出一个U型，
 #               3。近期出现过涨停，然后涨停之后急剧下跌，然后又拉起，
@@ -91,7 +91,7 @@ def buymethod4(data, endDate, code):
     return check1 and check2 and check3 and check4 and check5 and check6
 
 
-# 高位涨停，跌停交替型，300185，通裕重工，珈伟新能，300317，时间2020-09-14
+# 高位涨停，跌停交替型，珈伟新能，300317，时间2020-09-10
 #         1. 非创业板，涨幅10，创业板20，10个交易日能出现涨停，
 #         2. 2日内出现大幅下跌，要么跌停，要么跌幅每日跌幅都超过5%或者10%
 def buymethod5(data, endData, code):
@@ -165,6 +165,22 @@ def buymethod8(data, endData, code):
     check2 = stockutils.continuefitfunction(subdata, reduceCheck, 2)
     check3 = subdata['close'][-1] > subdata['ma60'][-1]
     return check1 and check2 and check3
+
+# 涨停之后，连续下跌，拓日新能 --002218，2020-09-29，亿晶光电--600537
+#           1. 涨停，  
+#           2.连续3日或者4日绿柱子，也就是close < open  
+#           3. 超过60日线
+def buymethod9(data, endDate, code):
+    pass
+
+# 恒星科技, 002132，2020-09-25
+            # 1. 一个至少超过3%的下跌，
+            # 2. 之前连续两日有上影线，
+            # 3. 都是上涨
+            # 4. 60日线
+def buymethod10(data, endDate, code):
+    pass
+
 
 
 # getids
