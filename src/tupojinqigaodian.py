@@ -166,12 +166,25 @@ def buymethod8(data, endData, code):
     check3 = subdata['close'][-1] > subdata['ma60'][-1]
     return check1 and check2 and check3
 
+
 # 涨停之后，连续下跌，拓日新能 --002218，2020-09-29，亿晶光电--600537
 #           1. 涨停，  
 #           2.连续3日或者4日绿柱子，也就是close < open  
 #           3. 超过60日线
-def buymethod9(data, endDate, code):
-    pass
+
+def buymethod9(data, endDate, code) -> bool:
+    subdata = data[:endDate]
+    def greencheck(d):
+        return d['close'][-1] < d['open'][-1]
+    continueday = 4
+    check2 = stockutils.continuefitfunction(subdata, greencheck, 4)
+    if not check2:
+        check2 = stockutils.continuefitfunction(subdata, greencheck, 3)
+        continueday = 3
+    check1 = subdata['pctChg'][-(continueday + 1)] > 9.9
+    check3 = subdata['close'][-1] > subdata['ma60'][-1]
+    return check1 and check2 and check3
+
 
 # 恒星科技, 002132，2020-09-25
             # 1. 一个至少超过3%的下跌，
@@ -179,28 +192,60 @@ def buymethod9(data, endDate, code):
             # 3. 都是上涨
             # 4. 60日线
 def buymethod10(data, endDate, code):
-    pass
+    subdata = data[:endDate]
+    check1 = subdata['pctChg'][-1] < -3
+    predata = subdata[:-1]
+
+    def toplinefun(rate):
+        def funinner(d):
+            return stockutils.daytopsingleline(d, rate, False)
+        return funinner
+    check2 = stockutils.continuefitfunction(predata, toplinefun(2), 2)
+    def raisecheck(d):
+        return d['pctChg'][-1] > 0
+    check3 = stockutils.continuefitfunction(predata, raisecheck)
+    check4 = subdata['close'][-1] > subdata['ma60'][-1]
+    return check1 and check2 and check3 and check4
 
 
+
+# 下跌背驰规则 , 中鼎股份 000887，深南股份 002417
+#           1. macd 线处于绿色，且背驰
+#           2. 低于5日局限，10日均线， 60日均线
+#           3. 近期下跌幅度大，至少30%
+#           4. 当日是近期30日最低点
+#           5. 连续3天下跌
+def buymethod11(data, endDate, code):
+    subdata = data[:endDate]
+    check1 = stockutils.macdstatuscheck(subdata, False)
+    close = subdata['close'][-1]
+    check2 = close < subdata['ma5'][-1] and close < subdata['ma10'][-1] and close < subdata['ma60'][-1]
+    thty = subdata[-30: ]
+    check3 = (thty['high'].max() - thty['low'].min()) / thty['low'].min() > 0.28
+    check4 = subdata['low'][-1] == thty['low'].min()
+
+    reduceCheck = lambda d: d['pctChg'][-1] <= 0
+    check5 = stockutils.continuefitfunction(subdata, reduceCheck, 3)
+    return check1 and check2 and check3 and check4 and check5 and subdata['pctChg'][-1] < -1.5
 
 # getids
 
 if __name__ == '__main__':
-    bs.login()
-    idCollect = getstockid.GetStockId()
-    #idCollect.downloadStockIdByDate()
+    #bs.login()
+    #idCollect = getstockid.GetStockId()
+    # idCollect.downloadStockIdByDate()
 
     # download data
-    dataUpdater = updatestocksdata.UpdateSocketData()
-    #dataUpdater.update()
-    bs.logout()
-    funarr = [buymethod1, buymethod2, buymethod3, buymethod4, buymethod5, bugmethod6, buymethod7, buymethod8]
+    #dataUpdater = updatestocksdata.UpdateSocketData()
+    # dataUpdater.update()
+    #bs.logout()
+    funarr = [buymethod1, buymethod2, buymethod3, buymethod4, buymethod5, bugmethod6, buymethod7, buymethod8, buymethod9, buymethod10, buymethod11]
     result = []
     for i in range(len(funarr)):
         result.append([])
 
     for id in stockids:
-        # id = '600303.SH'
+        # id = '002132.SZ'
         idfile = os.path.join(rootpath, id + '.csv')
         iddata = pd.read_csv(idfile, index_col='date', parse_dates=['date'])
         macd,  _, _ = stockutils.calculateMACD(iddata['close'])
@@ -212,6 +257,8 @@ if __name__ == '__main__':
         iddata['ma60'] = iddata['close'].rolling(60).mean()
         iddata['ma250'] = iddata['close'].rolling(250).mean()
         # method8 = buymethod8(iddata, '2020-09-24', '600303')
+        # method9 = buymethod9(iddata, '2020-09-29', '002218')
+        # method10 = buymethod10(iddata, '2020-09-25', '002132')
         # 市盈率检测
         if not stockutils.pecheck(iddata):
             continue
@@ -223,10 +270,10 @@ if __name__ == '__main__':
         # method5 = buymethod5(iddata, '2020-09-14', '300317')
         # method6 = bugmethod6(iddata, '2020-09-10', '300569')
         ids = id.split('.')
-        print(ids[0])
+        # print(ids[0])
 
         for i in range(len(funarr)):
-            if funarr[i](iddata, '2020-09-28', ids[0]):
+            if funarr[i](iddata, '2020-10-09', ids[0]):
                 result[i].append(ids[0])
 
     for i in range(len(result)):

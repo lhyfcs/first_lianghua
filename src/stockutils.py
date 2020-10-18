@@ -180,7 +180,7 @@ def midcentercheck(data, mixrate = 1.5):
 
 def pecheck(data):
     pe = data['peTTM'][-1]
-    return pe > 0 or pe < -30
+    return (pe > 0 or pe < -30) and 3 < data['close'][-1] < 50
 
 
 def continuefitfunction(data, fun, continuedata=2):
@@ -282,7 +282,7 @@ def mergeklineandcheckcenter(data):
     return False
 
 
-def macdstatuscheck(data):
+def macdstatuscheck(data, redraise=True):
     if data['macd'][-1] > 0:
         return False
     st1 = data['macd'] > 0
@@ -292,4 +292,7 @@ def macdstatuscheck(data):
 
     reds = [data[uptime[-1]: downtime[-1]]['macd'].sum(), data[uptime[-2]: downtime[-2]]['macd'].sum()]
     greens = [data[downtime[-1]:]['macd'].sum(), data[downtime[-2]: uptime[-1]]['macd'].sum()]
-    return reds[1] > reds[0] and reds[1] / reds[0] > 2
+    if redraise:
+        return reds[1] > reds[0] and reds[1] / reds[0] > 2
+    else:
+        return greens[1] < greens[0]
