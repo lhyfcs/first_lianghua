@@ -296,3 +296,19 @@ def macdstatuscheck(data, redraise=True):
         return reds[1] > reds[0] and reds[1] / reds[0] > 2
     else:
         return greens[1] < greens[0]
+
+# 在查找一定区域内，突破极值的数量,主要是排除那种无波动直线下跌或者上涨的股票
+def findBreakCountInLatestTime(data, checkRange, checkDay, top=True):
+    if len(data) < checkRange + checkDay:
+        return -1
+    count = 0
+    for i in range(0, checkDay):
+        if i == 0:
+            subdata = data[-i - checkRange:]
+        else:
+            subdata = data[-i - checkRange: -i]
+        if top and subdata['high'][-1] == subdata['high'].max():
+            count += 1
+        elif not top and subdata['low'][-1] == subdata['low'].min():
+            count += 1
+    return count

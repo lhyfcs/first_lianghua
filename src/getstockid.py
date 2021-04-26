@@ -42,8 +42,8 @@ class GetStockId:
 
     def downloadStockIdByDate(self):
         checkday = todaydate()
-        pro = ts.pro_api()
-        ts.pro_api('dec07c5bd502e7b1ee2d5a9f105ea04f62552df07b3c8ab6551dc7d0')
+        # pro = ts.pro_api()
+        pro = ts.pro_api('dec07c5bd502e7b1ee2d5a9f105ea04f62552df07b3c8ab6551dc7d0')
         data = pro.stock_basic(exchange='', list_status='L', fields='ts_code,symbol,name,area,industry,list_date, list_status, market')
         print(len(data))
         data = data[(data['list_date'] < checkday) & (~data['name'].str.contains('ST'))]

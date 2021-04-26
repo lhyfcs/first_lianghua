@@ -5,8 +5,10 @@ import getstockid
 import stockutils
 import updatestocksdata
 import baostock as bs
+import datetime
 
-stockids = getstockid.readstockids()
+# install conda & pytorch in mac
+# https://zwarrior.medium.com/configure-pytorch-for-pycharm-using-conda-in-macos-catalina-5bc6f2353c90
 rootpath = getstockid.getrootpath()
 
 # 检测方法，1，2020-08-13，天山生物，
@@ -228,23 +230,42 @@ def buymethod11(data, endDate, code):
     check5 = stockutils.continuefitfunction(subdata, reduceCheck, 3)
     return check1 and check2 and check3 and check4 and check5 and subdata['pctChg'][-1] < -1.5
 
+def searchIncreaseFast(data, endDate, code):
+    startPeriod = 300
+    subdata = data[-startPeriod:]
+    searchPeriod = 20
+    for i in range(0, startPeriod - searchPeriod):
+        period = subdata[i: i + searchPeriod]
+        low = period['low'].min()
+        high = period['high'].max()
+        if (high - low) / low > 1:
+            return True
+    return False
 # getids
 
-if __name__ == '__main__':
-    #bs.login()
-    #idCollect = getstockid.GetStockId()
-    # idCollect.downloadStockIdByDate()
+def feature_normalize(data):
+    mu = np.mean(data, axis=0)
+    std = np.std(data, axis=0)
+    return (data - mu)/std
 
-    # download data
-    #dataUpdater = updatestocksdata.UpdateSocketData()
+if __name__ == '__main__':
+    bs.login()
+    # idCollect = getstockid.GetStockId()
+    # idCollect.downloadStockIdByDate()
+    #
+    # # download data
+    # dataUpdater = updatestocksdata.UpdateSocketData()
     # dataUpdater.update()
-    #bs.logout()
-    funarr = [buymethod1, buymethod2, buymethod3, buymethod4, buymethod5, bugmethod6, buymethod7, buymethod8, buymethod9, buymethod10, buymethod11]
+    # bs.logout()
+    stockids = getstockid.readstockids()
+    # funarr = [buymethod1, buymethod2, buymethod3, buymethod4, buymethod5, bugmethod6, buymethod7, buymethod8, buymethod9, buymethod10, buymethod11]
+    funarr = [searchIncreaseFast]
     result = []
     for i in range(len(funarr)):
         result.append([])
 
-    for id in stockids:
+    curtime = datetime.datetime.now()
+    for index, id in enumerate(stockids):
         # id = '002132.SZ'
         idfile = os.path.join(rootpath, id + '.csv')
         iddata = pd.read_csv(idfile, index_col='date', parse_dates=['date'])
@@ -271,13 +292,22 @@ if __name__ == '__main__':
         # method6 = bugmethod6(iddata, '2020-09-10', '300569')
         ids = id.split('.')
         # print(ids[0])
-
+        # normal = feature_normalize(iddata['preclose'])
+        # topCount = stockutils.findBreakCountInLatestTime(iddata, 60, 200)
+        # btmCount = stockutils.findBreakCountInLatestTime(iddata, 60, 200, False)
         for i in range(len(funarr)):
-            if funarr[i](iddata, '2020-10-09', ids[0]):
+            if funarr[i](iddata, '2021-04-23', ids[0]):
                 result[i].append(ids[0])
+        if index % 50 == 0:
+            tmpCur = datetime.datetime.now()
+            print('time stamp', (tmpCur - curtime).seconds)
+            curtime = tmpCur
+            print('solve count', index)
 
     for i in range(len(result)):
         print('#########################  method ', i, "############################")
+        print('find count: ', len(result[i]))
         print(result[i])
+
 
     print('complete')
