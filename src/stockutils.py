@@ -178,9 +178,9 @@ def midcentercheck(data, mixrate = 1.5):
            mid.high < left.close and mid.high < right.close and 0 > midrate > -mixrate * 100
 
 
-def pecheck(data):
+def pecheck(data, close=50):
     pe = data['peTTM'][-1]
-    return (pe > 0 or pe < -30) and 3 < data['close'][-1] < 50
+    return (pe > 0 or pe < -30) and 3 < data['close'][-1] < close
 
 
 def continuefitfunction(data, fun, continuedata=2):
