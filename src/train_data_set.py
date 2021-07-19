@@ -1,4 +1,5 @@
 from torch.utils import data
+import torch
 import numpy as np
 import os
 from torchvision import transforms as T
@@ -23,5 +24,8 @@ class SocketTrainDataLoader(data.Dataset):
 
     def __getitem__(self, index):
         data = self.dataSet[index]
-        data = self.transforms(data)
-        return data, self.target[index]
+        # data = self.transforms(data)
+        # targetTensor = torch.zeros(200)
+        target = torch.tensor(self.target[index] + 100)
+        # targetTensor[target] = 1
+        return data, target

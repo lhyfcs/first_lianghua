@@ -1,12 +1,17 @@
 import pandas as pd
 import torch.utils.data as data_utils
 import torch.nn.functional as F
+import torch.nn as nn
 import torch
 import numpy as np
 import os
 import getstockid
 import stockutils
+import torchvision.transforms as transforms
+import torchvision.datasets as dset
 from train_data_set import SocketTrainDataLoader
+from net_classes import LinearNet
+import shutil
 
 rootpath = getstockid.getrootpath()
 
@@ -45,15 +50,22 @@ def normalizeCol(data, cols):
     for col in cols:
         data[col] = data[col] / maxValue
 
-def readconverttodataset():
+def readconverttodataset(savebyid):
     stockids = getstockid.readstockids()
-    dataRowNum = 30
+    dataRowNum = 50
     # train_data
     train_data = np.array([])
     target_train = np.array([])
     target_test = np.array([])
     test_data = np.array([])
+    total = len(stockids)
     for index, id in enumerate(stockids):
+        if savebyid:
+            folder = os.path.join(root, id);
+            if not os.path.exists(folder):
+                os.mkdir(folder)
+            else:
+                continue
         idfile = os.path.join(rootpath, id + '.csv')
         iddata = pd.read_csv(idfile, index_col='date', parse_dates=['date'])
         macd,  _, _ = stockutils.calculateMACD(iddata['close'])
@@ -65,8 +77,9 @@ def readconverttodataset():
         iddata['ma60'] = iddata['close'].rolling(60).mean()
         iddata['ma120'] = iddata['close'].rolling(120).mean()
         iddata['ma250'] = iddata['close'].rolling(250).mean()
-        if not stockutils.pecheck(iddata, 100):
-            continue
+        iddata = iddata[250:]
+        # if not stockutils.pecheck(iddata, 100):
+        #     continue
 
         preLen = len(iddata)
         # remove1 = iddata['tradestatus']==0
@@ -82,45 +95,54 @@ def readconverttodataset():
         # print(iddata.drop(['Unnamed: 0', 'code', 'volume', 'amount', 'tradestatus', 'isST'], axis=1)[-10:].to_numpy())
         socket_data = np.array([basedata[i: i + dataRowNum].to_numpy() for i in range(latlen - dataRowNum - 1)])
         # print(np.shape(socket_data))
-        target_data = np.array([int(iddata['pctChg'][i + dataRowNum] * 10) for i in range(0, latlen - dataRowNum - 1)])
-
-        keep_index = np.random.choice(np.arange(latlen - dataRowNum - 1), int(latlen * 0.5), False)
-        socket_data = socket_data[keep_index]
-        target_data = target_data[keep_index]
-        keep_len = len(socket_data);
-        test_index = np.random.choice(np.arange(keep_len), int(latlen * 0.2), False)
+        target_data = np.array([round(iddata['pctChg'][i + dataRowNum] * 10) for i in range(0, latlen - dataRowNum - 1)])
+        # 给每一个计算数据，则不需要进行裁剪
+        # 只保留数据的50%，从中选择测试数据和训练数据
+        if not savebyid:
+            keep_index = np.random.choice(np.arange(latlen - dataRowNum - 1), int(latlen * 0.5), False)
+            socket_data = socket_data[keep_index]
+            target_data = target_data[keep_index]
+        keep_len = len(socket_data)
+        test_index = np.random.choice(np.arange(keep_len), int(keep_len * 0.2), False)
         train_index = np.delete(np.arange(keep_len), test_index)
-        if test_data.any():
+        if test_data.any() and not savebyid:
             test_data = np.concatenate((test_data, socket_data[test_index]))
         else:
             test_data = socket_data[test_index]
         print('test_data size:', np.shape(test_data)[0])
-        if target_test.any():
+        if target_test.any() and not savebyid:
             target_test = np.concatenate((target_test, target_data[test_index]))
         else:
             target_test = target_data[test_index]
 
-        if train_data.any():
+        if train_data.any() and not savebyid:
             train_data = np.concatenate((train_data, socket_data[train_index]))
         else:
             train_data = socket_data[train_index]
         print('train_data size:', np.shape(train_data)[0])
-        if target_train.any():
+        if target_train.any() and not savebyid:
             target_train = np.concatenate((target_train, target_data[train_index]))
         else:
             target_train = target_data[train_index]
 
-        if (index + 1) % 100 == 0:
-            np.save(os.path.join(root, 'train.npy'), arr=train_data)
-            np.save(os.path.join(root, 'test.npy'), arr=test_data)
-            np.savetxt(os.path.join(root, 'target_train.csv'), X=target_train, fmt="%d", delimiter=',')
-            np.savetxt(os.path.join(root, 'target_test.csv'), X=target_test, fmt="%d", delimiter=',')
-        print('Index ', index, ' complete.')
+        if savebyid:
 
-    np.save(os.path.join(root, 'train.npy'), arr=train_data)
-    np.save(os.path.join(root, 'test.npy'), arr=test_data)
-    np.savetxt(os.path.join(root, 'target_train.csv'), X=target_train, fmt="%d", delimiter=',')
-    np.savetxt(os.path.join(root, 'target_test.csv'), X=target_test, fmt="%d", delimiter=',')
+            np.save(os.path.join(root, id, 'train.npy'), arr=train_data)
+            np.save(os.path.join(root, id, 'test.npy'), arr=test_data)
+            np.savetxt(os.path.join(root, id, 'target_train.csv'), X=target_train, fmt="%d", delimiter=',')
+            np.savetxt(os.path.join(root, id, 'target_test.csv'), X=target_test, fmt="%d", delimiter=',')
+        else:
+            if (index + 1) % 100 == 0:
+                np.save(os.path.join(root, 'train.npy'), arr=train_data)
+                np.save(os.path.join(root, 'test.npy'), arr=test_data)
+                np.savetxt(os.path.join(root, 'target_train.csv'), X=target_train, fmt="%d", delimiter=',')
+                np.savetxt(os.path.join(root, 'target_test.csv'), X=target_test, fmt="%d", delimiter=',')
+        print('Index {} complete. total is {} to {:.2%}'.format(index + 1, total, (index + 1) / total))
+
+    # np.save(os.path.join(root, 'train.npy'), arr=train_data)
+    # np.save(os.path.join(root, 'test.npy'), arr=test_data)
+    # np.savetxt(os.path.join(root, 'target_train.csv'), X=target_train, fmt="%d", delimiter=',')
+    # np.savetxt(os.path.join(root, 'target_test.csv'), X=target_test, fmt="%d", delimiter=',')
     print('Save data complete')
     # 每连续50组数据作为一个train data, dataRowNum = 50，下一个交易日的涨幅作为target，分类-200到200
     # 保存traindataset
@@ -132,12 +154,49 @@ def readconverttodataset():
 # 使用GAN模型
 # LSTM
 
+def linearTrain(id):
+    train_data = SocketTrainDataLoader(os.path.join(root, id))
+    train_loader = data_utils.DataLoader(dataset=train_data, shuffle=True, num_workers=2)
+    linearNet = LinearNet(50 * 18)
+    LR = 0.01
+    optimizer = torch.optim.Adam(linearNet.parameters(), lr=LR)
+    loss_func = nn.CrossEntropyLoss()
+    EPOCHS = 10
+    test_data = SocketTrainDataLoader(os.path.join(root, id))
+    test_loader = data_utils.DataLoader(dataset=test_data, shuffle=True, num_workers=2)
+    for epoch in range(EPOCHS):
+        for step, (batch_x, batch_y) in enumerate(train_loader):
+            batch_x = batch_x.view(-1, 50 * 18)
+            output = linearNet(batch_x.float())
+            loss = loss_func(output, batch_y)
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+        # validate with test
+        total = .0
+        for step, (test_x, test_y) in enumerate(test_loader):
+            pred_y = linearNet(test_x)
+            total += pred_y - test_y
+        accuracy = total / len(test_data)
+        print('Accuracy=%.2f' % accuracy)
 
 
+def clearOldData():
+
+    for _, dirs, files in os.walk(root):
+        for dir in dirs:
+            if dir == '.' or dir == '..':
+                continue
+            shutil.rmtree(os.path.join(root, dir))
 
 if __name__ == '__main__':
-    readconverttodataset()
-    # dataloader = SocketTrainDataLoader(root)
+    # clearOldData()
+    # readconverttodataset(True)
+    linearTrain('000001.SZ')
+
+
     # for _, (data, target) in enumerate(dataloader):
     #     data = data.squeeze(0)
     #     print(np.shape(data))

@@ -233,7 +233,7 @@ def buymethod11(data, endDate, code):
 def searchIncreaseFast(data, endDate, code):
     startPeriod = 300
     subdata = data[-startPeriod:]
-    searchPeriod = 20
+    searchPeriod = 25
     for i in range(0, startPeriod - searchPeriod):
         period = subdata[i: i + searchPeriod]
         low = period['low'].min()
@@ -250,13 +250,13 @@ def feature_normalize(data):
 
 if __name__ == '__main__':
     bs.login()
-    # idCollect = getstockid.GetStockId()
-    # idCollect.downloadStockIdByDate()
-    #
-    # # download data
-    # dataUpdater = updatestocksdata.UpdateSocketData()
-    # dataUpdater.update()
-    # bs.logout()
+    idCollect = getstockid.GetStockId()
+    idCollect.downloadStockIdByDate()
+
+    # download data
+    dataUpdater = updatestocksdata.UpdateSocketData()
+    dataUpdater.update()
+    bs.logout()
     stockids = getstockid.readstockids()
     # funarr = [buymethod1, buymethod2, buymethod3, buymethod4, buymethod5, bugmethod6, buymethod7, buymethod8, buymethod9, buymethod10, buymethod11]
     funarr = [searchIncreaseFast]
@@ -266,7 +266,7 @@ if __name__ == '__main__':
 
     curtime = datetime.datetime.now()
     for index, id in enumerate(stockids):
-        # id = '002132.SZ'
+        id = '603518.SH'
         idfile = os.path.join(rootpath, id + '.csv')
         iddata = pd.read_csv(idfile, index_col='date', parse_dates=['date'])
         macd,  _, _ = stockutils.calculateMACD(iddata['close'])
@@ -296,7 +296,7 @@ if __name__ == '__main__':
         # topCount = stockutils.findBreakCountInLatestTime(iddata, 60, 200)
         # btmCount = stockutils.findBreakCountInLatestTime(iddata, 60, 200, False)
         for i in range(len(funarr)):
-            if funarr[i](iddata, '2021-04-23', ids[0]):
+            if funarr[i](iddata, '2021-04-30', ids[0]):
                 result[i].append(ids[0])
         if index % 50 == 0:
             tmpCur = datetime.datetime.now()
