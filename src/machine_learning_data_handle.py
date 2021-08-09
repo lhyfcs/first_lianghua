@@ -11,7 +11,10 @@ import torchvision.transforms as transforms
 import torchvision.datasets as dset
 from train_data_set import SocketTrainDataLoader
 from net_classes import LinearNet
+from net_classes import CnnNet
+from net_classes import LSTMNet
 import shutil
+from datetime import datetime
 
 rootpath = getstockid.getrootpath()
 
@@ -52,7 +55,7 @@ def normalizeCol(data, cols):
 
 def readconverttodataset(savebyid):
     stockids = getstockid.readstockids()
-    dataRowNum = 50
+    dataRowNum = 48
     # train_data
     train_data = np.array([])
     target_train = np.array([])
@@ -90,7 +93,7 @@ def readconverttodataset(savebyid):
         # if preLen != latlen:
         #     print('code:', iddata['code'][0])
         # print(iddata['open', 'high', 'low', 'preclose', 'adjustflag', 'turn', 'pctChg', 'peTTM', 'psTTM', 'pcfNcfTTM', 'pbMRQ', 'macd', 'ma5', 'ma10', 'ma20', 'ma30', 'ma60', 'ma250'][-10:].to_numpy())
-        basedata = iddata.drop(['Unnamed: 0', 'code', 'volume', 'amount', 'tradestatus', 'isST', 'pctChg'], axis=1)
+        basedata = iddata.drop(['Unnamed: 0', 'code', 'volume', 'amount', 'adjustflag', 'tradestatus', 'isST', 'pctChg', 'pbMRQ'], axis=1)
         normalizeCol(basedata, ['open', 'high', 'low', 'close', 'preclose', 'ma5', 'ma10', 'ma20', 'ma30', 'ma60', 'ma120', 'ma250'])
         # print(iddata.drop(['Unnamed: 0', 'code', 'volume', 'amount', 'tradestatus', 'isST'], axis=1)[-10:].to_numpy())
         socket_data = np.array([basedata[i: i + dataRowNum].to_numpy() for i in range(latlen - dataRowNum - 1)])
@@ -105,6 +108,8 @@ def readconverttodataset(savebyid):
         keep_len = len(socket_data)
         test_index = np.random.choice(np.arange(keep_len), int(keep_len * 0.2), False)
         train_index = np.delete(np.arange(keep_len), test_index)
+        # for lstm generate data by date order, do not shuffle
+        # np.random.shuffle(train_index)
         if test_data.any() and not savebyid:
             test_data = np.concatenate((test_data, socket_data[test_index]))
         else:
@@ -144,7 +149,7 @@ def readconverttodataset(savebyid):
     # np.savetxt(os.path.join(root, 'target_train.csv'), X=target_train, fmt="%d", delimiter=',')
     # np.savetxt(os.path.join(root, 'target_test.csv'), X=target_test, fmt="%d", delimiter=',')
     print('Save data complete')
-    # 每连续50组数据作为一个train data, dataRowNum = 50，下一个交易日的涨幅作为target，分类-200到200
+    # 每连续48组数据作为一个train data, dataRowNum = 50，下一个交易日的涨幅作为target，分类-200到200
     # 保存traindataset
     # 获取部分生成testdata
 
@@ -154,33 +159,80 @@ def readconverttodataset(savebyid):
 # 使用GAN模型
 # LSTM
 
+def repackage_hidden(h):
+    """Wraps hidden states in new Tensors, to detach them from their history."""
+
+    if isinstance(h, torch.Tensor):
+        return h.detach()
+    else:
+        return tuple(repackage_hidden(v) for v in h)
+
 def linearTrain(id):
     train_data = SocketTrainDataLoader(os.path.join(root, id))
     train_loader = data_utils.DataLoader(dataset=train_data, shuffle=True, num_workers=2)
-    linearNet = LinearNet(50 * 18)
-    LR = 0.01
-    optimizer = torch.optim.Adam(linearNet.parameters(), lr=LR)
-    loss_func = nn.CrossEntropyLoss()
-    EPOCHS = 10
+    LR = 0.002
+    # for linear net type 1
+    # linearNet = LinearNet(50 * 17)
+    # optimizer = torch.optim.Adam(linearNet.parameters(), lr=LR)
+    # for cnn net typpe 2
+    # cnnTrainer = CnnNet()
+    # print(cnnTrainer)
+    # optimizer = torch.optim.Adam(cnnTrainer.parameters(), lr=LR)
+    lstmnet = LSTMNet(16, 2048, 1, 200)
+    hidden = lstmnet.init_hidden(1)
+    optimizer = torch.optim.Adam(lstmnet.parameters(), lr=LR)
+    loss_func = nn.CrossEntropyLoss()  #  该函数内包含softmax，所以训练函数内最后一步不需要再加softmax的激励函数
+    EPOCHS = 20
     test_data = SocketTrainDataLoader(os.path.join(root, id))
     test_loader = data_utils.DataLoader(dataset=test_data, shuffle=True, num_workers=2)
     for epoch in range(EPOCHS):
+        start = datetime.now()
         for step, (batch_x, batch_y) in enumerate(train_loader):
-            batch_x = batch_x.view(-1, 50 * 18)
-            output = linearNet(batch_x.float())
-            loss = loss_func(output, batch_y)
+            try:
+                # linear net type 1
+                # batch_x = batch_x.view(-1, 50 * 17)
+                # output = linearNet(batch_x.float())
 
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
+                # CNN net type 2
+                # batch_x = torch.unsqueeze(batch_x, 1)
+                # output = cnnTrainer(batch_x.float())
+                output, hidden = lstmnet(batch_x.float(), hidden)
+                hidden = repackage_hidden(hidden)
+                loss = loss_func(output, batch_y)
+                # print('train rate: %.6f' % loss.data)
+                optimizer.zero_grad()
+                loss.backward()
+                # for name, parms in linearNet.named_parameters():
+                #     print('-->name:', name, '-->grad_requirs:', parms.requires_grad, ' -->grad_value:', parms.grad)
+                optimizer.step()
+            except Exception as err:
+                print(err)
+        print('epoch training time: %d in %d' % ((datetime.now()-start).seconds, epoch))
         # validate with test
         total = .0
-        for step, (test_x, test_y) in enumerate(test_loader):
-            pred_y = linearNet(test_x)
-            total += pred_y - test_y
+        start = datetime.now()
+        torch.save(lstmnet.state_dict(), '../model/lstm.pkl')
+        hidden = lstmnet.init_hidden(1)
+        with torch.no_grad():
+            for step, (test_x, test_y) in enumerate(test_loader):
+                # linear net type 1
+                # test_x = test_x.view(-1, 50 * 17)
+                # pred_y = linearNet(test_x.float())
+
+                # CNN net type 2
+                # test_x = torch.unsqueeze(test_x, 1)
+                # pred_y = cnnTrainer(test_x.float())
+
+                pred_y, hidden = lstmnet(test_x.float(), hidden)
+                hidden = repackage_hidden(hidden)
+                # pred_y = torch.max(pred_y, 1)
+                loss = loss_func(pred_y, test_y)
+                # _, pred_label = torch.max(pred_y, 1)
+                total += loss.item()
+                # for LSTM best result accuracy = 4.03
         accuracy = total / len(test_data)
         print('Accuracy=%.2f' % accuracy)
+        print('epoch test time: %d in %d' % ((datetime.now() - start).seconds, epoch))
 
 
 def clearOldData():

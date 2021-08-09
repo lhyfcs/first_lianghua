@@ -62,13 +62,13 @@ class LeNet(nn.Module):
         self.fc2 = nn.Linear(500, 10)
 
     def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = F.max_pool2d(x, 2, 2)
-        x = F.relu(self.conv2(x))
-        x = F.max_pool2d(x, 2, 2)
-        x = x.view(-1, 4 * 4 * 50)
-        x = F.relu(self.fc1(x))
-        x = self.fc2(x)
+        x = F.relu(self.conv1(x)) # [1, 1, 28, 28] -> [1, 20, 24, 24]
+        x = F.max_pool2d(x, 2, 2) # [1, 20, 24, 24] -> [1, 20, 12, 12]
+        x = F.relu(self.conv2(x)) # [1, 20, 12, 12] -> [1, 50, 8, 8]
+        x = F.max_pool2d(x, 2, 2) # [1, 50, 8, 8] -> [1, 50, 4, 4]
+        x = x.view(-1, 4 * 4 * 50) # [1, 50, 4, 4] -> [1, 800]
+        x = F.relu(self.fc1(x)) # [1, 800] -> [1, 500]
+        x = self.fc2(x) # [1, 500] -> [10]
         return x
 
     def name(self):
@@ -76,7 +76,7 @@ class LeNet(nn.Module):
 
 if __name__ == '__main__':
     ## training
-    model = MLPNet()
+    model = LeNet()
 
     if use_cuda:
         model = model.cuda()

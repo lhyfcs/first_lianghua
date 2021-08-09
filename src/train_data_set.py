@@ -24,8 +24,11 @@ class SocketTrainDataLoader(data.Dataset):
 
     def __getitem__(self, index):
         data = self.dataSet[index]
-        # data = self.transforms(data)
-        # targetTensor = torch.zeros(200)
-        target = torch.tensor(self.target[index] + 100)
+        target = self.target[index] + 100
+        if target >= 200:
+            target = 199
+        elif target < 0:
+            target = 0
+        target = torch.tensor(target)
         # targetTensor[target] = 1
         return data, target
