@@ -27,6 +27,7 @@ class UpdateSocketData:
             # id = '000728.SZ'
             ids = id.split('.')
             print(ids[1].lower() + '.' + ids[0])
+            # download day data
             rs = bs.query_history_k_data_plus(ids[1].lower() + '.' + ids[0],
                                               "date,code,open,high,low,close,preclose,volume,amount,adjustflag,turn,tradestatus,pctChg,peTTM,pbMRQ,psTTM,isST",
                                               start_date=checkday, end_date='',
@@ -43,6 +44,16 @@ class UpdateSocketData:
             # data['ma250'] = data['close'].rolling(5).mean()
             # data = data.dropna(how='any')
             data.to_csv(os.path.join(rootFolder, id + '.csv'))
+            # download week data
+            rs = bs.query_history_k_data_plus(ids[1].lower() + '.' + ids[0],
+                                              "date,code,open,high,low,close,volume,amount,adjustflag,turn,pctChg",
+                                              start_date=checkday, end_date='',
+                                              frequency="d", adjustflag="3")
+            data_list = []
+            while (rs.error_code == '0') & rs.next():
+                data_list.append(rs.get_row_data())
+            weekdata = pd.DataFrame(data_list, columns=rs.fields)
+            weekdata.to_csv(os.path.join(rootFolder, 'week', id + '.csv'))
             print(id)
         # bs.logout()
 

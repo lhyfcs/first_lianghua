@@ -1,6 +1,11 @@
 import torch
 import torch.nn as nn
+import numpy as np
 
+MEMORY_CAPACITY = 2000
+EPISILO = 0.9
+Q_NETWORK_ITERATION = 100
+GAMMA = 0.9
 class LinearNet(nn.Module):
     def __init__(self, size, hidden=4096):
         super(LinearNet, self).__init__()
@@ -68,6 +73,57 @@ class LSTMNet(nn.Module):
                   weight.new(self.n_layers, batch_size, self.hidden_dim).zero_())
         return hidden
 
+
+
+# DQNnet, base on CNN
+# class DQNNet(nn.Module):
+#     def __init__(self, size, action_size, lr = 0.0001):
+#         super(DQNNet, self).__init__()
+#         self.action_size = action_size
+#         self.size = size
+#         self.eval_net, self.target_net = LinearNet(), LinearNet()
+#         self.learn_setp_counter = 0
+#         self.memory_counter = 0
+#         self.memory = np.zeros(MEMORY_CAPACITY, size * 2 + 2)
+#         self.optimizer = torch.optim.Adam(self.eval_net.parameters(), lr = lr)
+#         self.loss_func = nn.MSELoss()
+#
+#     def choose_action(self, state):
+#         state = torch.unsqueeze(torch.FloatTensor(state), 0)
+#         if np.random.randn() < EPISILO:
+#             action_value = self.eval_net.forward(state)
+#             action = torch.max(action_value, 1)[1].data.numpy()
+#             action = action[0]
+#         else:
+#             action = np.random.randint(0, self.action_size)
+#         return action
+#
+#     def store_transition(self, state, action, reward, next_state):
+#         transition = np.stack(state, [action, reward], next_state)
+#         index = self.memory_counter % MEMORY_CAPACITY
+#         self.memory[index, :] = transition
+#         self.memory_counter += 1
+#
+#     def learn(self):
+#         if self.learn_setp_counter % Q_NETWORK_ITERATION == 0:
+#             self.target_net.load_state_dict(self.eval_net.state_dict())
+#         self.learn_setp_counter += 1
+#         sample_index = np.random.choice(MEMORY_CAPACITY, 1)
+#         batch_memory = self.memory[sample_index, :]
+#         batch_state = torch.FloatTensor(batch_memory[:, :self.size])
+#         batch_action = torch.FloatTensor(batch_memory[:, self.size :self.size+1].astype(int))
+#         batch_reward = torch.FloatTensor(batch_memory[: self.size + 1: self.size + 2])
+#         batch_next_state = torch.FloatTensor(batch_memory[:, -self.size:])
+#         q_eval = self.eval_net(batch_state).gather(1, batch_action)
+#         q_next = self.target_net(batch_next_state).detach()
+#         q_target = batch_reward + GAMMA * q_next.max(1)[0].view(1, 1)
+#         loss = self.loss_func(q_eval, q_target)
+#
+#         self.optimizer.zero_grad()
+#         loss.backward()
+#         self.optimizer.step()
+#
+#     def reward_func(self, ):
 
 
 
