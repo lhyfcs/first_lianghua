@@ -6,6 +6,9 @@ import stockutils
 import updatestocksdata
 import baostock as bs
 import datetime
+from drawkline import InterCandle
+import matplotlib.pyplot as plt
+import pickle5
 
 # install conda & pytorch in mac
 # https://zwarrior.medium.com/configure-pytorch-for-pycharm-using-conda-in-macos-catalina-5bc6f2353c90
@@ -258,15 +261,16 @@ if __name__ == '__main__':
     dataUpdater.update()
     bs.logout()
     stockids = getstockid.readstockids()
-    # funarr = [buymethod1, buymethod2, buymethod3, buymethod4, buymethod5, bugmethod6, buymethod7, buymethod8, buymethod9, buymethod10, buymethod11]
-    funarr = [searchIncreaseFast]
+    funarr = [buymethod1, buymethod2, buymethod3, buymethod4, buymethod5, bugmethod6, buymethod7, buymethod8, buymethod9, buymethod10, buymethod11]
+    # funarr = [searchIncreaseFast]
     result = []
     for i in range(len(funarr)):
         result.append([])
 
     curtime = datetime.datetime.now()
+    findStock = []
     for index, id in enumerate(stockids):
-        id = '603518.SH'
+#        id = '603518.SH'
         idfile = os.path.join(rootpath, id + '.csv')
         iddata = pd.read_csv(idfile, index_col='date', parse_dates=['date'])
         macd,  _, _ = stockutils.calculateMACD(iddata['close'])
@@ -298,6 +302,7 @@ if __name__ == '__main__':
         for i in range(len(funarr)):
             if funarr[i](iddata, '2021-04-30', ids[0]):
                 result[i].append(ids[0])
+                findStock.append(id)
         if index % 50 == 0:
             tmpCur = datetime.datetime.now()
             print('time stamp', (tmpCur - curtime).seconds)
@@ -308,6 +313,14 @@ if __name__ == '__main__':
         print('#########################  method ', i, "############################")
         print('find count: ', len(result[i]))
         print(result[i])
-
-
+    findStock = list(set(findStock))
+    print(findStock)
+    with open(os.path.join(rootpath, 'findstock.txt'), "wb") as fp:  # Pickling
+        pickle5.dump(findStock, fp)
+    # with open("test.txt", "rb") as fp:  # Unpickling
+    #     findStock = pickle5.load(fp)
+    candle = InterCandle(findStock)
+    candle.refresh_texts(candle.df.iloc[candle.idx_start + candle.idx_range])
+    candle.refresh_plot(candle.idx_start, candle.idx_range)
+    plt.show()
     print('complete')

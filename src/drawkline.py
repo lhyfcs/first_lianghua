@@ -9,8 +9,10 @@ from matplotlib.widgets import Button
 import mplfinance as mpf
 from mpl_finance import candlestick2_ochl
 from matplotlib.font_manager import FontManager
+from matplotlib.widgets import Cursor
 from stockutils import calculateMACD
 import indicatorCal
+import datetime
 ff = FontManager()
 # ff.ttflist   list all support font name
 
@@ -103,7 +105,7 @@ def draw_fun_new(file_path, id, name):
 
 # template style define
 template_color='(0.82, 0.83, 0.85)'
-my_color = mpf.make_marketcolors(up='r', down='g', edge='i', wick='i',volume='i')
+my_color = mpf.make_marketcolors(up='r', down='g', edge='i', wick='i', volume='i')
 my_style = mpf.make_mpf_style(marketcolors=my_color, figcolor=template_color, gridcolor=template_color)
 
 title_font = {'fontname': 'pingfang HK',
@@ -237,18 +239,21 @@ class InterCandle:
         # f'{last_data["preclose"]}'
         self.t22 = fig.text(0.85, 0.86, '', **normal_font)
 
-    def loadnewiddata(self, id):
+    def loadnewiddata(self, id, loadcontext=False):
         # load ids data, include stock id and stock name
         self.idsinfo = pd.read_csv(os.path.join(rootpath, 'ids.csv'))
         self.name = self.idsinfo.loc[self.idsinfo['symbol'] == int(id.split('.')[0])]['name'].values[0]
+        self.id = id
         self.fillfulldata(id, self.name)
         self.calculateindicators()
         # df = df[['date', 'open', 'close', 'high', 'low', 'volume', 'amount']]
-        self.style = my_style
-        self.idx_start = 0
-        self.idx_range = 100
-        self.fig = mpf.figure(style=my_style, figsize=(12, 8), facecolor=(0.82, 0.83, 0.85))
-        self.addframecontext(self.fig, id, self.name)
+        self.style = my_style\
+        # show the latest data
+        self.idx_range = 150
+        self.idx_start = len(self.df) - self.idx_range - 1
+
+        if loadcontext:
+            self.addframecontext(self.fig, id, self.name)
         self.pressed = False
         self.xpress = None
         self.avg_type = 'ma'
@@ -268,9 +273,16 @@ class InterCandle:
         # indicatorCal.rsi_cal(self.weekdf, 20)
         # indicatorCal.DMA(self.weekdf, 3, 20, 6)
 
-    def __init__(self, id):
-        self.loadnewiddata(id)
+    def __init__(self, ids):
+
+        self.stockids = ids
+        self.curstockindex = 0
+        self.fig = mpf.figure(style=my_style, figsize=(15.9, 10.6), facecolor=(0.82, 0.83, 0.85))
+        # choose the first id to show
+        self.loadnewiddata(self.stockids[self.curstockindex], True)
+
         # 下面代码在__init__ 中，告诉matplotlib哪些回调函数用于响应哪些事件
+        self.cursor = Cursor(self.ax1, useblit=False, color='red', linewidth=1)
         # 鼠标按下事件与self.on_press回调函数绑定
         self.fig.canvas.mpl_connect('button_press_event', self.on_press)
         # 鼠标按键释放事件与self.on_release回调函数绑定
@@ -280,16 +292,29 @@ class InterCandle:
         # 新增回调函数和鼠标滚轮事件绑定
         self.fig.canvas.mpl_connect('scroll_event', self.on_scroll)
         # 新增键盘按下消息响应
-        # self.fig.canvas.mpl_connect('key_press_event', self.on_key)
+        self.fig.canvas.mpl_connect('key_press_event', self.on_key)
+
 
 
     def on_key(self, event):
-        if event.data == 'w':
+        if event.key == 'w':
             self.drawdatatype = 'w'
             self.drawdata = self.weekdf
-        elif event.data == 'd':
+        elif event.key == 'd':
             self.drawdatatype = 'd'
             self.drawdata = self.df
+        elif event.key == 'n':
+            self.drawdatatype = 'd'
+            if self.curstockindex < len(self.stockids) - 1:
+                self.curstockindex += 1
+                self.loadnewiddata(self.stockids[self.curstockindex])
+                self.refreshwholeplot()
+        elif event.key == 'p':
+            self.drawdatatype = 'd'
+            if self.curstockindex > 0:
+                self.curstockindex -= 1
+                self.loadnewiddata(self.stockids[self.curstockindex])
+                self.refreshwholeplot()
 
     def on_scroll(self, event):
         if event.inaxes != self.ax1:
@@ -307,7 +332,7 @@ class InterCandle:
         self.ax1.clear()
         self.ax2.clear()
         self.ax3.clear()
-        self.refresh_texts(self.df.iloc[self.idx_start])
+        self.refresh_texts(self.df.iloc[self.idx_start + self.idx_range])
         self.refresh_plot(self.idx_start, self.idx_range)
 
     def refreshwholeplot(self):
@@ -315,7 +340,7 @@ class InterCandle:
         self.ax2.clear()
         self.ax3.clear()
         # 更新图表里的文字内容
-        self.refresh_texts(self.df.iloc[self.idx_start])
+        self.refresh_texts(self.df.iloc[self.idx_start + self.idx_range])
         self.refresh_plot(self.idx_start, self.idx_range)
 
     def on_press(self, event):
@@ -357,6 +382,10 @@ class InterCandle:
     def on_motion(self, event):
         # 如果鼠标没有按下，则什么事情都不需要做
         if not self.pressed:
+            # normal move, just refresh context, show the data detail the cursor focus
+            if not event.inaxes == self.ax1:
+                return
+            self.refresh_texts(self.df.iloc[self.idx_start + int(event.xdata)])
             return
         if not event.inaxes == self.ax1:
             return
@@ -366,14 +395,15 @@ class InterCandle:
         # 设定平移的结果，控制平移的范围不超过界限
         if new_start < 0:
             new_start = 0
-        if new_start > len(self.df) - 100:
-            new_start = len(self.df) - 100
+        if new_start > len(self.df) - self.idx_range - 1:
+            new_start = len(self.df) - self.idx_range - 1
         # 清除各个表格内的内容，为重绘做准备
         self.ax1.clear()
         self.ax2.clear()
         self.ax3.clear()
         # 更新图表里的文字内容
-        self.refresh_texts(self.df.iloc[new_start])
+        self.idx_start = new_start
+        self.refresh_texts(self.df.iloc[self.idx_start + self.idx_range])
         self.refresh_plot(new_start, self.idx_range)
 
 
@@ -386,8 +416,8 @@ class InterCandle:
         self.idx_start -= dx
         if self.idx_start < 0:
             self.idx_start = 0
-        if self.idx_start > len(self.df) - 100:
-            self.idx_start = len(self.df) - 100
+        if self.idx_start > len(self.df) - self.idx_range - 1:
+            self.idx_start = len(self.df) - self.idx_range - 1
 
     def refresh_plot(self, idx_start, idx_range = 100):
         """ 根据最新的参数，重绘整个图表
@@ -420,11 +450,16 @@ class InterCandle:
             ap3.append(mpf.make_addplot(plot_data[['DIF', 'AMA']], ylabel='dema', ax=self.ax3))
         elif self.indicator == 'kdj':
             ap3.append(mpf.make_addplot(plot_data[['kdj_k', 'kdj_d', 'kdj_j']], ylabel='kdj', ax=self.ax3))
-        mpf.plot(plot_data, ax=self.ax1, volume=self.ax2, addplot=ap3, type='candle', style=my_style)
+        mpl.rcParams['axes.prop_cycle'] = cycler(
+            color=['white', 'gray', 'navy', 'teal', 'maroon', 'darkorange', 'indigo'])
+        # tight_layout 紧密布局
+        mpf.plot(plot_data, ax=self.ax1, volume=self.ax2, addplot=ap3, type='candle', style=my_style, xrotation=15, datetime_format='%Y-%m-%d', tight_layout=True)
+
         self.fig.show()
 
 
     def refresh_texts(self, last_data):
+        self.t1.set_text('%s - %s' % (self.id, self.name))
         self.t3.set_text(f'{np.round(last_data["open"], 3)}/{np.round(last_data["close"], 3)}')
         self.t5.set_text(f'{np.round(last_data["change"], 3)}')
         self.t7.set_text(f'{np.round(last_data["change"] / last_data["preclose"] * 100, 2)}%')
@@ -432,7 +467,7 @@ class InterCandle:
         self.t10.set_text(f'{last_data["high"]}')
         self.t12.set_text(f'{last_data["low"]}')
         self.t14.set_text(f'{np.round(last_data["volume"] / 10000, 3)}')
-        self.t16.set_text(f'{last_data["amount"]}')
+        self.t16.set_text(f'{np.round(last_data["amount"] / 100000000, 3)}')
         self.t18.set_text(f'{np.round(last_data["upper_lim"], 3)}')
         self.t20.set_text(f'{np.round(last_data["lower_lim"], 3)}')
         self.t22.set_text(f'{last_data["preclose"]}')
@@ -446,10 +481,11 @@ class InterCandle:
         self.t5.set_color(close_number_color)
         self.t7.set_color(close_number_color)
 
+
 if __name__ == '__main__':
-    id = '603518.SH'
+    ids = ['603518.SH','300193.SZ']
     # idfile = os.path.join(rootpath, id + '.csv')
-    candle = InterCandle(id)
-    candle.refresh_texts(candle.df.iloc[200])
-    candle.refresh_plot(100)
+    candle = InterCandle(ids)
+    candle.refresh_texts(candle.df.iloc[candle.idx_start + candle.idx_range])
+    candle.refresh_plot(candle.idx_start, candle.idx_range)
     plt.show()
