@@ -54,3 +54,9 @@ def DKJ(data, N, M1, M2):
 def DMA(data, N1, N2, M):
      data['DIF'] = data['close'].rolling(N1).mean() - data['close'].rolling(N2).mean()
      data['AMA'] = data['close'].rolling(M).mean()
+
+
+# 计算均线
+def mavaluecalculate(data, avgs = [5, 10, 20, 60, 120, 250]):
+    for avg in avgs:
+        data[f'ma{avg}'] = data['close'].rolling(avg).mean()

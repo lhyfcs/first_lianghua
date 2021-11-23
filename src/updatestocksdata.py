@@ -48,7 +48,7 @@ class UpdateSocketData:
             rs = bs.query_history_k_data_plus(ids[1].lower() + '.' + ids[0],
                                               "date,code,open,high,low,close,volume,amount,adjustflag,turn,pctChg",
                                               start_date=checkday, end_date='',
-                                              frequency="d", adjustflag="3")
+                                              frequency="w", adjustflag="2")
             data_list = []
             while (rs.error_code == '0') & rs.next():
                 data_list.append(rs.get_row_data())

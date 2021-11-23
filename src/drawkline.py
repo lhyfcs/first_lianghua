@@ -161,13 +161,13 @@ class InterCandle:
         df['macd-m'] = diff
         df['macd-s'] = dea
         df['macd-h'] = macd
-        df['ma5'] = df['close'].rolling(5).mean()
-        df['ma10'] = df['close'].rolling(10).mean()
-        df['ma20'] = df['close'].rolling(20).mean()
-        df['ma30'] = df['close'].rolling(30).mean()
-        df['ma60'] = df['close'].rolling(60).mean()
-        df['ma120'] = df['close'].rolling(120).mean()
-        df['ma250'] = df['close'].rolling(250).mean()
+        # df['ma5'] = df['close'].rolling(5).mean()
+        # df['ma10'] = df['close'].rolling(10).mean()
+        # df['ma20'] = df['close'].rolling(20).mean()
+        # # df['ma30'] = df['close'].rolling(30).mean()
+        # df['ma60'] = df['close'].rolling(60).mean()
+        # df['ma120'] = df['close'].rolling(120).mean()
+        # df['ma250'] = df['close'].rolling(250).mean()
         if id.startswith('300') or id.startswith('688'):
             df['upper_lim'] = df['preclose'] * 1.2
             df['lower_lim'] = df['preclose'] * 0.8
@@ -177,16 +177,17 @@ class InterCandle:
         df.set_index(['Date'], inplace=True)
         self.df = df
         # load week data
-        # weekfile = os.path.join(rootpath, 'week', id + '.csv')
-        # weekdf = pd.read_csv(weekfile)
-        # weekdf['proclose'] = weekdf['close'].shift(1, fill_value=0)
-        # weekdf['Date'] = pd.to_datetime((weekdf['date']))
-        # weekdf['change'] = weekdf['close'] - weekdf['preclose']
-        # macd, diff, dea = calculateMACD(weekdf['close'])
-        # weekdf['macd-m'] = diff
-        # weekdf['macd-s'] = dea
-        # weekdf['macd-h'] = macd
-        # self.weekdf = weekdf
+        weekfile = os.path.join(rootpath, 'week', id + '.csv')
+        weekdf = pd.read_csv(weekfile)
+        weekdf['preclose'] = weekdf['close'].shift(1, fill_value=0)
+        weekdf['Date'] = pd.to_datetime((weekdf['date']))
+        weekdf['change'] = weekdf['close'] - weekdf['preclose']
+        macd, diff, dea = calculateMACD(weekdf['close'])
+        weekdf['macd-m'] = diff
+        weekdf['macd-s'] = dea
+        weekdf['macd-h'] = macd
+        self.weekdf = weekdf
+        weekdf.set_index(['Date'], inplace=True)
 
 
     def addframecontext(self, fig, id, name):
@@ -247,10 +248,11 @@ class InterCandle:
         self.fillfulldata(id, self.name)
         self.calculateindicators()
         # df = df[['date', 'open', 'close', 'high', 'low', 'volume', 'amount']]
-        self.style = my_style\
+        self.style = my_style
         # show the latest data
         self.idx_range = 150
-        self.idx_start = len(self.df) - self.idx_range - 1
+        self.resetdrawdata()
+        self.idx_start = len(self.drawdata) - self.idx_range - 1
 
         if loadcontext:
             self.addframecontext(self.fig, id, self.name)
@@ -258,8 +260,6 @@ class InterCandle:
         self.xpress = None
         self.avg_type = 'ma'
         self.indicator = 'macd'
-        self.drawdatatype = 'd'
-        self.drawdata = self.df
 
     def calculateindicators(self):
         # indicator for day data
@@ -267,14 +267,15 @@ class InterCandle:
         indicatorCal.DKJ(self.df, 9, 3, 3)
         indicatorCal.DMA(self.df, 30, 5, 8)
         indicatorCal.rsi_cal(self.df, 20)
+        indicatorCal.mavaluecalculate(self.df)
         # indicator for week data
-        # indicatorCal.boll_bands(self.weekdf, 20)
-        # indicatorCal.DKJ(self.weekdf, 9, 3, 3)
-        # indicatorCal.rsi_cal(self.weekdf, 20)
-        # indicatorCal.DMA(self.weekdf, 3, 20, 6)
+        indicatorCal.boll_bands(self.weekdf, 20)
+        indicatorCal.DKJ(self.weekdf, 9, 3, 3)
+        indicatorCal.rsi_cal(self.weekdf, 20)
+        indicatorCal.DMA(self.weekdf, 20, 3, 5)
+        indicatorCal.mavaluecalculate(self.weekdf)
 
     def __init__(self, ids):
-
         self.stockids = ids
         self.curstockindex = 0
         self.fig = mpf.figure(style=my_style, figsize=(15.9, 10.6), facecolor=(0.82, 0.83, 0.85))
@@ -300,17 +301,21 @@ class InterCandle:
         if event.key == 'w':
             self.drawdatatype = 'w'
             self.drawdata = self.weekdf
+            self.idx_start = len(self.drawdata) - self.idx_range - 1
+            self.refreshwholeplot()
         elif event.key == 'd':
             self.drawdatatype = 'd'
             self.drawdata = self.df
+            self.idx_start = len(self.drawdata) - self.idx_range - 1
+            self.refreshwholeplot()
         elif event.key == 'n':
-            self.drawdatatype = 'd'
+            self.resetdrawdata()
             if self.curstockindex < len(self.stockids) - 1:
                 self.curstockindex += 1
                 self.loadnewiddata(self.stockids[self.curstockindex])
                 self.refreshwholeplot()
         elif event.key == 'p':
-            self.drawdatatype = 'd'
+            self.resetdrawdata()
             if self.curstockindex > 0:
                 self.curstockindex -= 1
                 self.loadnewiddata(self.stockids[self.curstockindex])
@@ -324,7 +329,7 @@ class InterCandle:
         if event.button == 'up':
             scale_factor = 1.2
         self.idx_range = int(self.idx_range * scale_factor)
-        data_length = len(self.df)
+        data_length = len(self.drawdata)
         if self.idx_range >= data_length - self.idx_start:
             self.idx_range = data_length - self.idx_start
         if self.idx_range <= 30:
@@ -332,15 +337,19 @@ class InterCandle:
         self.ax1.clear()
         self.ax2.clear()
         self.ax3.clear()
-        self.refresh_texts(self.df.iloc[self.idx_start + self.idx_range])
+        self.refresh_texts(self.drawdata.iloc[self.idx_start + self.idx_range])
         self.refresh_plot(self.idx_start, self.idx_range)
+
+    def resetdrawdata(self):
+        self.drawdata = self.df
+        self.drawdatatype = 'd'
 
     def refreshwholeplot(self):
         self.ax1.clear()
         self.ax2.clear()
         self.ax3.clear()
         # 更新图表里的文字内容
-        self.refresh_texts(self.df.iloc[self.idx_start + self.idx_range])
+        self.refresh_texts(self.drawdata.iloc[self.idx_start + self.idx_range])
         self.refresh_plot(self.idx_start, self.idx_range)
 
     def on_press(self, event):
@@ -385,7 +394,7 @@ class InterCandle:
             # normal move, just refresh context, show the data detail the cursor focus
             if not event.inaxes == self.ax1:
                 return
-            self.refresh_texts(self.df.iloc[self.idx_start + int(event.xdata)])
+            self.refresh_texts(self.drawdata.iloc[self.idx_start + int(event.xdata)])
             return
         if not event.inaxes == self.ax1:
             return
@@ -395,15 +404,15 @@ class InterCandle:
         # 设定平移的结果，控制平移的范围不超过界限
         if new_start < 0:
             new_start = 0
-        if new_start > len(self.df) - self.idx_range - 1:
-            new_start = len(self.df) - self.idx_range - 1
+        if new_start > len(self.drawdata) - self.idx_range - 1:
+            new_start = len(self.drawdata) - self.idx_range - 1
         # 清除各个表格内的内容，为重绘做准备
         self.ax1.clear()
         self.ax2.clear()
         self.ax3.clear()
         # 更新图表里的文字内容
         self.idx_start = new_start
-        self.refresh_texts(self.df.iloc[self.idx_start + self.idx_range])
+        self.refresh_texts(self.drawdata.iloc[self.idx_start + self.idx_range])
         self.refresh_plot(new_start, self.idx_range)
 
 
@@ -416,18 +425,18 @@ class InterCandle:
         self.idx_start -= dx
         if self.idx_start < 0:
             self.idx_start = 0
-        if self.idx_start > len(self.df) - self.idx_range - 1:
-            self.idx_start = len(self.df) - self.idx_range - 1
+        if self.idx_start > len(self.drawdata) - self.idx_range - 1:
+            self.idx_start = len(self.drawdata) - self.idx_range - 1
 
     def refresh_plot(self, idx_start, idx_range = 100):
         """ 根据最新的参数，重绘整个图表
         """
-        all_data = self.df
+        all_data = self.drawdata
         plot_data = all_data.iloc[idx_start: idx_start + idx_range]
         # 添加均线到ax1
         ap3 = []
         if self.avg_type == 'ma':
-            ap3.append(mpf.make_addplot(plot_data[['ma5', 'ma10', 'ma20', 'ma30', 'ma60', 'ma120', 'ma250']], ax=self.ax1))
+            ap3.append(mpf.make_addplot(plot_data[['ma5', 'ma10', 'ma20', 'ma60', 'ma120', 'ma250']], ax=self.ax1))
         else:
             ap3.append(
                 mpf.make_addplot(plot_data[['bb-u', 'bb-m', 'bb-l']], ax=self.ax1))
@@ -468,8 +477,12 @@ class InterCandle:
         self.t12.set_text(f'{last_data["low"]}')
         self.t14.set_text(f'{np.round(last_data["volume"] / 10000, 3)}')
         self.t16.set_text(f'{np.round(last_data["amount"] / 100000000, 3)}')
-        self.t18.set_text(f'{np.round(last_data["upper_lim"], 3)}')
-        self.t20.set_text(f'{np.round(last_data["lower_lim"], 3)}')
+        if self.drawdatatype == 'd':
+            self.t18.set_text(f'{np.round(last_data["upper_lim"], 3)}')
+            self.t20.set_text(f'{np.round(last_data["lower_lim"], 3)}')
+        else:
+            self.t18.set_text('')
+            self.t20.set_text('')
         self.t22.set_text(f'{last_data["preclose"]}')
         if last_data['change'] > 0:
             close_number_color = 'red'
