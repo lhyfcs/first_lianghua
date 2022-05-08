@@ -57,6 +57,6 @@ def DMA(data, N1, N2, M):
 
 
 # 计算均线
-def mavaluecalculate(data, avgs = [5, 10, 20, 60, 120, 250]):
+def mavaluecalculate(data, avgs = [5, 10, 20, 30, 60, 120, 250]):
     for avg in avgs:
         data[f'ma{avg}'] = data['close'].rolling(avg).mean()

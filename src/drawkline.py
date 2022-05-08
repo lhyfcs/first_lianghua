@@ -13,6 +13,7 @@ from matplotlib.widgets import Cursor
 from stockutils import calculateMACD
 import indicatorCal
 import datetime
+import time
 ff = FontManager()
 # ff.ttflist   list all support font name
 
@@ -105,8 +106,13 @@ def draw_fun_new(file_path, id, name):
 
 # template style define
 template_color='(0.82, 0.83, 0.85)'
-my_color = mpf.make_marketcolors(up='r', down='g', edge='i', wick='i', volume='i')
-my_style = mpf.make_mpf_style(marketcolors=my_color, figcolor=template_color, gridcolor=template_color)
+fig_color = '(0.24, 0.24, 0.24)'
+my_color = mpf.make_marketcolors(up='r', down='aqua', edge='i', wick='i', volume='i')
+# https://stackoverflow.com/questions/60599812/how-can-i-customize-mplfinance-plot
+# https://notebooks.githubusercontent.com/view/ipynb?browser=chrome&color_mode=auto&commit=1f710caa65d872a761ccb5831fb1befd7324881f&device=unknown&enc_url=68747470733a2f2f7261772e67697468756275736572636f6e74656e742e636f6d2f6d6174706c6f746c69622f6d706c66696e616e63652f316637313063616136356438373261373631636362353833316662316265666437333234383831662f6578616d706c65732f7374796c65732e6970796e62&logged_in=false&nwo=matplotlib%2Fmplfinance&path=examples%2Fstyles.ipynb&platform=android&repository_id=226144726&repository_type=Repository&version=98
+# 设置黑色背景，base_mpf_style， 设置价格字体颜色base_mpl_style
+# base_mpf_style='nightclouds', base_mpl_style='seaborn',
+my_style = mpf.make_mpf_style(marketcolors=my_color, figcolor=fig_color, gridcolor=fig_color, facecolor='black', gridaxis='horizontal', gridstyle='-')
 
 title_font = {'fontname': 'pingfang HK',
               'size': '16',
@@ -239,6 +245,8 @@ class InterCandle:
         self.t21 = fig.text(0.85, 0.86, '昨收: ', **normal_label_font)
         # f'{last_data["preclose"]}'
         self.t22 = fig.text(0.85, 0.86, '', **normal_font)
+        self.t23 = fig.text(0.85, 0.90, '换手率: ', **normal_label_font)
+        self.t24 = fig.text(0.85, 0.90, '', **normal_font)
 
     def loadnewiddata(self, id, loadcontext=False):
         # load ids data, include stock id and stock name
@@ -384,7 +392,7 @@ class InterCandle:
             self.pressed = True
             # 记录按下位置的x坐标
             self.xpress = event.xdata
-            self.refreshwholeplot()
+            # self.refreshwholeplot()
 
 
 
@@ -436,7 +444,11 @@ class InterCandle:
         # 添加均线到ax1
         ap3 = []
         if self.avg_type == 'ma':
-            ap3.append(mpf.make_addplot(plot_data[['ma5', 'ma10', 'ma20', 'ma60', 'ma120', 'ma250']], ax=self.ax1))
+            # 设置每条均线的颜色，因为不支持colors参数
+            # 颜色示例 https://matplotlib.org/3.1.0/gallery/color/named_colors.html
+            for [name, color] in [['ma5', 'white'], ['ma10', 'yellow'], ['ma20', 'fuchsia'], ['ma30', 'lime'], ['ma60', 'darkgrey'], ['ma120', 'royalblue'], ['ma250', 'lightskyblue']]:
+                ap3.append(mpf.make_addplot(plot_data[[name]], ax=self.ax1, color=color))
+                # ap3.append(mpf.make_addplot(plot_data[['ma5', 'ma10', 'ma20', 'ma60', 'ma120', 'ma250']], ax=self.ax1))
         else:
             ap3.append(
                 mpf.make_addplot(plot_data[['bb-u', 'bb-m', 'bb-l']], ax=self.ax1))
@@ -463,8 +475,13 @@ class InterCandle:
             color=['white', 'gray', 'navy', 'teal', 'maroon', 'darkorange', 'indigo'])
         # tight_layout 紧密布局
         mpf.plot(plot_data, ax=self.ax1, volume=self.ax2, addplot=ap3, type='candle', style=my_style, xrotation=15, datetime_format='%Y-%m-%d', tight_layout=True)
-
-        self.fig.show()
+        # 重绘十字
+        self.cursor = Cursor(self.ax1, useblit=False, color='red', linewidth=1)
+        # 快速刷新，否则如果不操作任何东西，永远也不会刷新
+        self.fig.canvas.draw()
+        self.fig.canvas.flush_events()
+        time.sleep(0.1)
+        print('refresh plot complete')
 
 
     def refresh_texts(self, last_data):
@@ -475,7 +492,7 @@ class InterCandle:
         self.t8.set_text(f'{last_data.name.date()}')
         self.t10.set_text(f'{last_data["high"]}')
         self.t12.set_text(f'{last_data["low"]}')
-        self.t14.set_text(f'{np.round(last_data["volume"] / 10000, 3)}')
+        self.t14.set_text(f'{np.round(last_data["volume"] / 1000000, 3)}')
         self.t16.set_text(f'{np.round(last_data["amount"] / 100000000, 3)}')
         if self.drawdatatype == 'd':
             self.t18.set_text(f'{np.round(last_data["upper_lim"], 3)}')
@@ -484,6 +501,7 @@ class InterCandle:
             self.t18.set_text('')
             self.t20.set_text('')
         self.t22.set_text(f'{last_data["preclose"]}')
+        self.t24.set_text(f'{np.round(last_data["turn"], 2)}%')
         if last_data['change'] > 0:
             close_number_color = 'red'
         elif last_data['change'] < 0:
